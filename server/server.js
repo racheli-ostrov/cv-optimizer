@@ -131,6 +131,7 @@
 // });
 import express from "express";
 import dotenv from "dotenv";
+import fs from "fs";
 import cors from "cors";
 
 import optimizeRoutes from "./routes/optimizeRoutes.js";
@@ -144,9 +145,41 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Serve built client (if present)
+import path from "path";
+const clientDistPath = path.join(process.cwd(), "client", "dist");
+try {
+  // serve static files if dist exists
+  app.use(express.static(clientDistPath));
+  // SPA fallback
+  app.get("/", (req, res) => {
+    res.sendFile(path.join(clientDistPath, "index.html"), (err) => {
+      if (err) res.status(404).send("Not found");
+    });
+  });
+} catch (e) {
+  // ignore if client not built
+}
+
 // Routes
 app.use("/api", optimizeRoutes);
 app.use("/api", downloadRoutes);
+
+// Serve a small .well-known file to avoid 404 noise from browser devtools
+const wellKnownPath = path.join(process.cwd(), ".well-known", "appspecific");
+try {
+  fs.mkdirSync(wellKnownPath, { recursive: true });
+  const wkFile = path.join(wellKnownPath, "com.chrome.devtools.json");
+  if (!fs.existsSync(wkFile)) fs.writeFileSync(wkFile, JSON.stringify({}));
+  app.use("/.well-known", express.static(path.join(process.cwd(), ".well-known")));
+  // Explicit route to ensure the devtools-specific path never returns 404
+  app.get("/.well-known/appspecific/com.chrome.devtools.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.send(JSON.stringify({}));
+  });
+} catch (e) {
+  // ignore
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

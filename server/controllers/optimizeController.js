@@ -4,6 +4,10 @@ import { optimizeCVService } from "../services/pdfService.js";
 
 export const optimizeCV = async (req, res) => {
   try {
+    console.log('Optimize request received:', req.method, req.originalUrl);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Body keys:', Object.keys(req.body || {}));
+    console.log('File:', req.file ? { originalname: req.file.originalname, mimetype: req.file.mimetype, size: req.file.size } : null);
     const { jobDescription } = req.body;
     if (!req.file) return res.status(400).json({ error: "No CV uploaded" });
     if (!jobDescription) return res.status(400).json({ error: "Job description missing" });
@@ -14,6 +18,12 @@ export const optimizeCV = async (req, res) => {
 
     const outputFileName = `optimized-${Date.now()}.pdf`;
     const outputPath = path.join("generated", outputFileName);
+    // Ensure generated directory exists
+    try {
+      fs.mkdirSync(path.join(process.cwd(), "generated"), { recursive: true });
+    } catch (e) {
+      // ignore
+    }
 
     fs.writeFileSync(outputPath, improvedContent);
     fs.unlinkSync(req.file.path);
