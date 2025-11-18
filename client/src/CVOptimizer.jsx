@@ -1,5 +1,7 @@
 // CVOptimizer.jsx (moved into src)
 import React, { useCallback, useRef, useState } from "react";
+import "./styles.css";
+
 
 // Dynamically import heavy libs to avoid bundling them if not necessary
 const loadPdfJs = async () => {
