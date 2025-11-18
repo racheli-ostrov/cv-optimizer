@@ -34,7 +34,7 @@ const createPDF = (outputPath, content) => {
     stream.on("finish", () => resolve());
     stream.on("error", (err) => reject(err));
   });
-});
+};
 
 app.post("/api/optimize-for-job", upload.single("cv"), async (req, res) => {
   try {
