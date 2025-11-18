@@ -34,6 +34,8 @@ export default function ResumeAIClient() {
   const [parsing, setParsing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [downloadUrl, setDownloadUrl] = useState(null);
   const fileInputRef = useRef(null);
 
   const onDrop = useCallback((e) => {
@@ -52,6 +54,7 @@ export default function ResumeAIClient() {
     setParsing(true);
     setAnalysis(null);
     setFileName(file.name);
+    setUploadedFile(file);
     try {
       const text = await extractTextFromFile(file);
       setRawText(text);
@@ -135,6 +138,53 @@ export default function ResumeAIClient() {
     } finally { setLoadingAI(false); }
   }
 
+  // Upload CV file and job description to the server endpoint which runs the LLM
+  async function optimizeOnServer() {
+    if (!uploadedFile) {
+      alert("אין קובץ להעלות — העלה קובץ לפני שליחה לסרבר.");
+      return;
+    }
+    if (!jobText) {
+      alert("הזן תיאור משרה לפני שליחה לסרבר.");
+      return;
+    }
+
+    setLoadingAI(true);
+    setDownloadUrl(null);
+    try {
+      const form = new FormData();
+      // server expects field name 'cv' for the uploaded file and jobDescription in body
+      form.append("cv", uploadedFile);
+      form.append("jobDescription", jobText);
+
+      // If server runs locally on port 3000, call that URL. Adjust if different.
+      const res = await fetch("http://localhost:3000/api/optimize-for-job", {
+        method: "POST",
+        body: form,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Server returned an error");
+      }
+
+      const body = await res.json();
+      if (body && body.filename) {
+        const url = `http://localhost:3000/api/download/${encodeURIComponent(body.filename)}`;
+        setDownloadUrl(url);
+        // open in new tab to download
+        window.open(url, "_blank");
+      } else {
+        alert("השרת החזיר תשובה ללא קובץ להורדה.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("שגיאה בתקשורת עם השרת: " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  }
+
   const [jobText, setJobText] = useState("");
 
   const downloadFile = (type) => {
@@ -166,7 +216,12 @@ export default function ResumeAIClient() {
         <h3 className="font-semibold mb-2">תיאור משרה</h3>
         <p className="text-sm text-gray-600 mb-2">הדבק כאן את תיאור המשרה, והמערכת תתאים אוטומטית את קורות החיים.</p>
         <textarea className="w-full h-32 p-3 border rounded resize-none" placeholder="הדבק תיאור משרה..." value={jobText} onChange={e => setJobText(e.target.value)} />
-        <button onClick={() => callRemoteAI("/api/optimize", JSON.stringify({ cv: rawText, job: jobText }))} className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">בצע אופטימיזציה לקורות החיים לפי המשרה</button>
+        <button onClick={optimizeOnServer} disabled={loadingAI} className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">שלח לסרבר לאופטימיזציה</button>
+        {downloadUrl && (
+          <div className="mt-2">
+            <a href={downloadUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline">הורד קובץ ממחולל הסרבר</a>
+          </div>
+        )}
       </div>
       <div className="my-6 flex gap-4">
         <button onClick={() => downloadFile("pdf")} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">הורד PDF</button>
