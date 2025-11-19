@@ -267,180 +267,176 @@ export default function CVOptimizer() {
     setMessages((prev) => [...prev, { text, sender }]);
   };
 
-  
   const onSend = async () => {
-  if (!input.trim()) return;
+    if (!input.trim()) return;
 
-  if (showWelcome) {
-    setWelcomeFade(true);
-    setTimeout(() => setShowWelcome(false), 500);
-  }
+    if (showWelcome) {
+      setWelcomeFade(true);
+      setTimeout(() => setShowWelcome(false), 500);
+    }
 
-  addMessage(input, "user");
+    addMessage(input, "user");
 
-  const answer = input.trim().toLowerCase();
+    const answer = input.trim().toLowerCase();
 
-  // --- שלב 1: ניתוח והצגת המלצות לשיפור ---
-  if (awaitingImproveAnswer) {
-    if (answer === "כן" || answer === "yes") {
-      if (cvSuggestions.length > 0) {
-        const first = cvSuggestions[0];
-        const last = cvSuggestions[cvSuggestions.length - 1];
-        const middle = cvSuggestions.slice(1, -1);
+    // --- שלב 1: ניתוח והצגת המלצות לשיפור ---
+    if (awaitingImproveAnswer) {
+      if (answer === "כן" || answer === "yes") {
+        if (cvSuggestions.length > 0) {
+          const first = cvSuggestions[0];
+          const last = cvSuggestions[cvSuggestions.length - 1];
+          const middle = cvSuggestions.slice(1, -1);
 
-        let formattedSuggestions = "";
-        if (first) formattedSuggestions += `${first}\n`;
-        middle.forEach((s, i) => {
-          formattedSuggestions += `${i + 1}. ${s}\n`;
-        });
-        if (last && cvSuggestions.length > 1) formattedSuggestions += `${last}\n`;
+          let formattedSuggestions = "";
+          if (first) formattedSuggestions += `${first}\n`;
+          middle.forEach((s, i) => {
+            formattedSuggestions += `${i + 1}. ${s}\n`;
+          });
+          if (last && cvSuggestions.length > 1) formattedSuggestions += `${last}\n`;
 
+          addMessage(
+            `הקורות חיים שלך מצוינים והם מקבלים ציון של ${cvSuggestions.length}.\n\n${formattedSuggestions}`,
+            "ai"
+          );
+        } else {
+          addMessage("אין לי הערות לשיפור, קורות החיים שלך מצוינים!", "ai");
+        }
+
+        setAwaitingImproveAnswer(false);
+        setAwaitingDownloadAnswer(true); // שלב הבא: הורדת PDF
+        addMessage("שנוציא יחד קובץ חדש ומשוכלל יותר של קורות חיים בשבילך?", "ai");
+      } else if (answer === "לא" || answer === "no") {
         addMessage(
-          `הקורות חיים שלך מצוינים והם מקבלים ציון של ${cvSuggestions.length}.\n\n${formattedSuggestions}`,
+          "חבל מאוד--- יכולת לקבל קורות חיים טובים יותר, אם את/ה מתחרט/ת אפשר תמיד להעלות שוב",
           "ai"
         );
+        setAwaitingImproveAnswer(false);
       } else {
-        addMessage("אין לי הערות לשיפור, קורות החיים שלך מצוינים!", "ai");
+        addMessage(' 🤔 על פי תשובתך לא הבנתי אם כן או לא', "ai");
       }
 
-      setAwaitingImproveAnswer(false);
-      setAwaitingDownloadAnswer(true); // שלב הבא: הורדת PDF
-      addMessage("שנוציא יחד קובץ חדש ומשוכלל יותר של קורות חיים בשבילך?", "ai");
-    } else if (answer === "לא" || answer === "no") {
-      addMessage(
-        "חבל מאוד--- יכולת לקבל קורות חיים טובים יותר, אם את/ה מתחרט/ת אפשר תמיד להעלות שוב",
-        "ai"
-      );
-      setAwaitingImproveAnswer(false);
-    } else {
-      addMessage(' 🤔 על פי תשובתך לא הבנתי אם כן או לא', "ai");
-    }
-
-    setInput("");
-    return;
-  }
-
-  // --- שלב 2: הורדת PDF ---
-  if (awaitingDownloadAnswer) {
-    if (answer === "כן" || answer === "yes") {
-      try {
-        // קריאה לפונקציה שמבקשת מהשרת ליצור ולהחזיר PDF
-        await downloadImprovedPDF(improvedContent); 
-        addMessage("ה-PDF נוצר בהצלחה! תוכל/י להוריד אותו עכשיו.", "ai");
-      } catch (err) {
-        addMessage("שגיאה ביצירת ה-PDF, נסה/י שוב מאוחר יותר.", "ai");
-      }
-    } else if (answer === "לא" || answer === "no") {
-      addMessage("בסדר, אם תרצה/י אפשר תמיד לנסות שוב.", "ai");
-    } else {
-      addMessage(' 🤔 לא הבנתי אם רוצים להוריד את הקובץ או לא', "ai");
-    }
-
-    setAwaitingDownloadAnswer(false);
-    setInput("");
-    return;
-  }
-
-  // --- אם המשתמש עוד לא העלה קובץ ---
-  if (!uploadedFile) {
-    setWaitingCount(waitingCount + 1);
-    setTimeout(() => {
-      addMessage(
-        waitingCount === 0 ? "היי אני מחכה לקורות חיים שלך" : "קורות חיים חביבי ,קורות חיים -לא סיפורי חיים",
-        "ai"
-      );
-    }, 600);
-    setInput("");
-    return;
-  }
-
-  if (analysisDone) {
-    setInput("");
-    return;
-  }
-
-  setInput("");
-};
-
-const handleFileUpload = (file) => {
-  const allowedTypes = ["application/pdf", 
-                        "application/msword", 
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-
-  if (!allowedTypes.includes(file.type)) {
-    addMessage("❌ נא להעלות קובץ Word או PDF בלבד", "ai");
-    return;
-  }
-
-  setFileName(file.name);
-  setUploadedFile(file);
-  setWaitingCount(0);
-  setAnalysisDone(false);
-  setCvSuggestions([]);
-  setAwaitingImproveAnswer(false);
-  addMessage(`📄 קובץ נטען: ${file.name}`, "user");
-
-  setTimeout(() => {
-    addMessage("הקורות חיים באמצע ניתוח- זה הזמן להתפלל🙏", "ai");
-  }, 400);
-
-  setTimeout(() => {
-    addMessage("קיבלתי את הקורות חיים שלך- ניכרת ההשקעה והזמן🙌", "ai");
-    sendFileToServer(file);
-  }, 1200);
-};
-
-async function sendFileToServer(file) {
-  try {
-    addMessage("מנתח את הנתונים שלך -תהליך זה עשוי לקחת כמה רגעים...", "ai");
-    const form = new FormData();
-    form.append("cv", file, file.name);
-
-    const res = await fetch("http://localhost:3000/api/optimize-for-job", {
-      method: "POST",
-      body: form,
-    });
-
-    if (!res.ok) {
-      const txt = await res.text();
-      // אם קיבלנו 429 מהשרת
-      if (txt.includes('"code":429')) {
-        addMessage("המערכת עמוסה כרגע, אנא נסה שנית בעוד מספר שניות ⏳", "ai");
-        return;
-      }
-      addMessage(`שגיאה מהשרת: ${txt}`, "ai");
+      setInput("");
       return;
     }
 
-    const body = await res.json();
-    let suggestions = [];
-    if (body.analysis && Array.isArray(body.analysis.suggestions)) {
-      suggestions = body.analysis.suggestions;
+    // --- שלב 2: הורדת PDF ---
+    if (awaitingDownloadAnswer) {
+      if (answer === "כן" || answer === "yes") {
+        try {
+          // קריאה לפונקציה שמבקשת מהשרת ליצור ולהחזיר PDF
+          await downloadImprovedPDF(improvedContent);
+          addMessage("ה-PDF נוצר בהצלחה! תוכל/י להוריד אותו עכשיו.", "ai");
+        } catch (err) {
+          addMessage("שגיאה ביצירת ה-PDF, נסה/י שוב מאוחר יותר.", "ai");
+        }
+      } else if (answer === "לא" || answer === "no") {
+        addMessage("בסדר, אם תרצה/י אפשר תמיד לנסות שוב.", "ai");
+      } else {
+        addMessage(' 🤔 לא הבנתי אם רוצים להוריד את הקובץ או לא', "ai");
+      }
+
+      setAwaitingDownloadAnswer(false);
+      setInput("");
+      return;
     }
-    setCvSuggestions(suggestions);
+
+    // --- אם המשתמש עוד לא העלה קובץ ---
+    if (!uploadedFile) {
+      setWaitingCount(waitingCount + 1);
+      setTimeout(() => {
+        addMessage(
+          waitingCount === 0 ? "היי אני מחכה לקורות חיים שלך" : "קורות חיים חביבי ,קורות חיים -לא סיפורי חיים",
+          "ai"
+        );
+      }, 600);
+      setInput("");
+      return;
+    }
+
+    if (analysisDone) {
+      setInput("");
+      return;
+    }
+
+    setInput("");
+  };
+
+  const handleFileUpload = (file) => {
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      addMessage("❌ נא להעלות קובץ Word או PDF בלבד", "ai");
+      return;
+    }
+
+    setFileName(file.name);
+    setUploadedFile(file);
+    setWaitingCount(0);
+    setAnalysisDone(false);
+    setCvSuggestions([]);
+    setAwaitingImproveAnswer(false);
+    addMessage(`📄 קובץ נטען: ${file.name}`, "user");
 
     setTimeout(() => {
-      addMessage('האם אתה רוצה שנכתוב יחד קורות חיים משופרים?', "ai");
-      setAwaitingImproveAnswer(true);
-    }, 600);
-    setImprovedContent(
-  "קורות חיים משופרים:\n\n" + suggestions.join("\n")
-);
+      addMessage("הקורות חיים באמצע ניתוח- זה הזמן להתפלל🙏", "ai");
+    }, 400);
 
+    setTimeout(() => {
+      addMessage("קיבלתי את הקורות חיים שלך- ניכרת ההשקעה והזמן🙌", "ai");
+      sendFileToServer(file);
+    }, 1200);
+  };
 
-    setAnalysisDone(true);
-  } catch (e) {
-    console.error(e);
-    addMessage("שגיאה בתקשורת עם השרת — בדוק שהשרת רץ ונסה שוב.", "ai");
+  async function sendFileToServer(file) {
+    try {
+      addMessage("מנתח את הנתונים שלך -תהליך זה עשוי לקחת כמה רגעים...", "ai");
+      const form = new FormData();
+      form.append("cv", file, file.name);
+
+      const res = await fetch("http://localhost:3000/api/optimize-for-job", {
+        method: "POST",
+        body: form,
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        if (txt.includes('"code":429')) {
+          addMessage("המערכת עמוסה כרגע, אנא נסה שנית בעוד מספר שניות ⏳", "ai");
+          return;
+        }
+        addMessage(`שגיאה מהשרת: ${txt}`, "ai");
+        return;
+      }
+
+      const body = await res.json();
+      let suggestions = [];
+      if (body.analysis && Array.isArray(body.analysis.suggestions)) {
+        suggestions = body.analysis.suggestions;
+      }
+      setCvSuggestions(suggestions);
+
+      setTimeout(() => {
+        addMessage('האם אתה רוצה שנכתוב יחד קורות חיים משופרים?', "ai");
+        setAwaitingImproveAnswer(true);
+      }, 600);
+
+      setImprovedContent("קורות חיים משופרים:\n\n" + suggestions.join("\n"));
+      setAnalysisDone(true);
+    } catch (e) {
+      console.error(e);
+      addMessage("שגיאה בתקשורת עם השרת — בדוק שהשרת רץ ונסה שוב.", "ai");
+    }
   }
-}
+
 const downloadImprovedPDF = async (improvedContent) => {
   const response = await fetch("http://localhost:3000/api/download-improved-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      improvedContent: improvedContent
-    })
+    body: JSON.stringify({ improvedContent }),
   });
 
   if (!response.ok) throw new Error("Failed to generate PDF");
@@ -453,7 +449,6 @@ const downloadImprovedPDF = async (improvedContent) => {
   a.download = "improved_cv.pdf";
   a.click();
 };
-
 
   return (
     <div className="max-w-4xl mx-auto fade-in" style={{ paddingBottom: "6rem" }}>
