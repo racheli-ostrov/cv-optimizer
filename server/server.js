@@ -1,141 +1,11 @@
-// import express from "express";
-// import multer from "multer";
-// import fs from "fs";
-// import path from "path";
-// import PDFDocument from "pdfkit";
-// import dotenv from "dotenv";
-// import cors from "cors";
-// import { GoogleGenAI } from "@google/genai";
-
-// dotenv.config();
-
-// const app = express();
-// const PORT = process.env.PORT || 3000;
-
-// app.use(cors());
-// app.use(express.json());
-
-// const upload = multer({ dest: "uploads/" });
-
-// const client = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-// const pdfToBase64 = (filePath) => {
-//   const fileData = fs.readFileSync(filePath);
-//   return Buffer.from(fileData).toString("base64");
-// };
-
-// const createPDF = (outputPath, content) => {
-//   return new Promise((resolve, reject) => {
-//     const doc = new PDFDocument({ size: "A4", margin: 50 });
-//     const stream = fs.createWriteStream(outputPath);
-//     doc.pipe(stream);
-//     doc.font("Times-Roman").text(content, { align: "left" });
-//     doc.end();
-//     stream.on("finish", () => resolve());
-//     stream.on("error", (err) => reject(err));
-//   });
-// };
-
-// app.post("/api/optimize-for-job", upload.single("cv"), async (req, res) => {
-//   try {
-//     const { jobDescription } = req.body;
-//     if (!req.file) return res.status(400).json({ error: "No CV uploaded" });
-//     if (!jobDescription) return res.status(400).json({ error: "Job description missing" });
-
-//     const base64CV = pdfToBase64(req.file.path);
-
-//     const prompt = `
-// You are an expert resume optimizer, HR analyst, and ATS specialist.
-
-// Your task: Rewrite and optimize the candidate’s resume so it fits the job description as accurately as possible, without inventing experience that does not exist. You may rephrase, restructure, highlight, or reorganize content — but never fabricate.
-
-// ### Input:
-// 1. Candidate Resume (raw text): ${base64CV}
-// 2. Job Description: ${jobDescription}
-
-// ### Requirements:
-// 1. Create a fully optimized resume tailored to the job description.
-// 2. Ensure the resume passes ATS scanners:
-//    - Use keywords from the job description naturally.
-//    - Emphasize measurable achievements (numbers, metrics, impact).
-//    - Strengthen relevant skills, tools, technologies, and responsibilities.
-//    - Reorganize sections to prioritize job-relevant content.
-// 3. Improve clarity, language, professionalism, and formatting flow.
-// 4. Keep the resume concise, focused, and strong.
-// 5. Do NOT add skills or experience that are not supported by the resume.
-// 6. If experience is relevant but weakly written, rewrite it to highlight impact.
-// 7. Where appropriate, merge duplicate items and remove irrelevant content.
-// 8. Output ONLY the optimized resume in clean text form, structured as:
-//    - Header (optional placeholders for personal info)
-//    - Professional Summary (short and tailored)
-//    - Skills (grouped and optimized)
-//    - Experience (rewritten + achievement-oriented)
-//    - Education
-//    - Certifications / Additional sections (if present in the CV)
-
-// ### Output:
-// Return ONLY the optimized resume text. Do not provide explanations.
-// `;
-
-//     const aiResponse = await client.models.generateContent({
-//       model: "text-bison-001",
-//       input: prompt
-//     });
-
-//     const aiOutput = aiResponse.outputText || "{}";
-//     let parsedOutput;
-//     try {
-//       parsedOutput = JSON.parse(aiOutput);
-//     } catch (e) {
-//       parsedOutput = { error: "Could not parse AI output" };
-//     }
-
-//     const outputFileName = `optimized-${Date.now()}.pdf`;
-//     const outputPath = path.join("generated", outputFileName);
-//     await createPDF(outputPath, parsedOutput.improvedCVContent || "No content");
-
-//     fs.unlinkSync(req.file.path);
-
-//     res.json({
-//       analysis: parsedOutput,
-//       filename: outputFileName
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// });
-
-// app.get("/api/download/:filename", (req, res) => {
-//   const { filename } = req.params;
-//   const filePath = path.join("generated", filename);
-
-//   if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
-
-//   res.setHeader("Content-Type", "application/pdf");
-//   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-//   res.download(filePath, filename, (err) => {
-//     if (err) {
-//       console.error(err);
-//     } else {
-//       fs.unlink(filePath, (unlinkErr) => {
-//         if (unlinkErr) console.error(unlinkErr);
-//       });
-//     }
-//   });
-// });
-
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
 import express from "express";
-import dotenv from "dotenv";
+import multer from "multer";
 import fs from "fs";
+import path from "path";
+import PDFDocument from "pdfkit";
+import dotenv from "dotenv";
 import cors from "cors";
-
-import optimizeRoutes from "./routes/optimizeRoutes.js";
-import downloadRoutes from "./routes/downloadRoutes.js";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
@@ -145,41 +15,120 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Serve built client (if present)
-import path from "path";
-const clientDistPath = path.join(process.cwd(), "client", "dist");
-try {
-  // serve static files if dist exists
-  app.use(express.static(clientDistPath));
-  // SPA fallback
-  app.get("/", (req, res) => {
-    res.sendFile(path.join(clientDistPath, "index.html"), (err) => {
-      if (err) res.status(404).send("Not found");
+const upload = multer({ dest: "uploads/" });
+
+const client = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const pdfToBase64 = (filePath) => {
+  const fileData = fs.readFileSync(filePath);
+  return Buffer.from(fileData).toString("base64");
+};
+
+const createPDF = (outputPath, content) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const stream = fs.createWriteStream(outputPath);
+    doc.pipe(stream);
+    doc.font("Times-Roman").text(content, { align: "left" });
+    doc.end();
+    stream.on("finish", () => resolve());
+    stream.on("error", (err) => reject(err));
+  });
+};
+
+app.post("/api/optimize-for-job", upload.single("cv"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No CV uploaded" });
+
+    // read CV and convert to base64 (used in prompt)
+    const base64CV = pdfToBase64(req.file.path);
+
+    // Prompt requests only improvement suggestions (each on its own line).
+    const prompt = `
+You are an expert resume reviewer and career coach.
+Task: Read the candidate resume (base64) and return improvement suggestions only.
+Output requirements:
+- Respond ONLY with improvement suggestions in Hebrew, each suggestion on its own line.
+- Do not invent experience.
+- At the end include one compliment sentence about the effort invested.
+Resume (base64): ${base64CV}
+`;
+
+    // call Gemeni model (choose an available model from list; change if needed)
+    const aiResponse = await client.models.generateContent({
+      model: "models/gemini-2.5-pro",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
-  });
-} catch (e) {
-  // ignore if client not built
-}
 
-// Routes
-app.use("/api", optimizeRoutes);
-app.use("/api", downloadRoutes);
+    // robust extraction of text from different SDK response shapes
+    const aiOutput =
+      // candidates -> content -> text (common)
+      aiResponse?.candidates?.[0]?.content?.[0]?.text ||
+      // older SDK shape
+      aiResponse?.outputText ||
+      // fallback to stringifying the whole response
+      (typeof aiResponse === "string" ? aiResponse : JSON.stringify(aiResponse));
 
-// Serve a small .well-known file to avoid 404 noise from browser devtools
-const wellKnownPath = path.join(process.cwd(), ".well-known", "appspecific");
-try {
-  fs.mkdirSync(wellKnownPath, { recursive: true });
-  const wkFile = path.join(wellKnownPath, "com.chrome.devtools.json");
-  if (!fs.existsSync(wkFile)) fs.writeFileSync(wkFile, JSON.stringify({}));
-  app.use("/.well-known", express.static(path.join(process.cwd(), ".well-known")));
-  // Explicit route to ensure the devtools-specific path never returns 404
-  app.get("/.well-known/appspecific/com.chrome.devtools.json", (req, res) => {
-    res.setHeader("Content-Type", "application/json");
-    res.send(JSON.stringify({}));
+    // parse lines into suggestions array (clean bullets/numbers)
+    let parsedOutput = { suggestions: [] };
+    if (aiOutput && typeof aiOutput === "string") {
+      const lines = aiOutput
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+
+      // try to keep the compliment as the last line if it's not an item
+      parsedOutput.suggestions = lines.map((line) =>
+        line.replace(/^[•\-\*\d\.\)\s]+/, "").trim()
+      );
+    } else {
+      parsedOutput = { suggestions: ["לא הצלחתי לנתח את קורות החיים."] };
+    }
+
+    // cleanup uploaded file
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch (e) {
+      console.warn("Could not delete uploaded file:", e?.message || e);
+    }
+
+    return res.json({ analysis: parsedOutput });
+  } catch (err) {
+    // log full error locally for debugging
+    console.error("Error in /api/optimize-for-job:", err);
+
+    // build friendly message for client
+    const status = err?.status || err?.code || 500;
+    let message = err?.message || "Internal server error";
+    if (err?.error) message = typeof err.error === "string" ? err.error : JSON.stringify(err.error);
+
+    // return useful info for debugging (no stack in production)
+    return res.status(status).json({
+      error: message,
+      stack: process.env.NODE_ENV === "production" ? undefined : err?.stack,
+    });
+  }
+});
+
+app.get("/api/download/:filename", (req, res) => {
+  const { filename } = req.params;
+  const filePath = path.join("generated", filename);
+
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+  res.download(filePath, filename, (err) => {
+    if (err) {
+      console.error(err);
+    } else {
+      fs.unlink(filePath, (unlinkErr) => {
+        if (unlinkErr) console.error(unlinkErr);
+      });
+    }
   });
-} catch (e) {
-  // ignore
-}
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
