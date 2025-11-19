@@ -106,3 +106,19 @@ footer a {
   transition: all 0.2s ease;
 }
 footer a:hover { color: #a5b4fc; }
+.msg-bubble {
+  max-width: 80%;           /* עדכן את האחוז לפי רצונך (ex: 90% או 70%) */
+  width: auto;
+  white-space: pre-wrap;    /* שומר על שורות ושברים */
+  word-wrap: break-word;
+  word-break: break-word;
+  display: inline-block;
+}
+/* אופציונלי: אם תרצה בועות משתמש רחבות יותר */
+.msg-bubble.user {
+  max-width: 78%;
+}
+/* ו/או בועת ה‑AI מיוחדת */
+.msg-bubble.ai {
+  max-width: 82%;
+}

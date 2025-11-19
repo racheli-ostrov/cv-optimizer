@@ -1,5 +1,4 @@
-// // Gemini Chat React component: Welcome message with fade-out effect after first Enter
-// import React, { useCallback, useRef, useState, useEffect } from "react";
+// import React, { useRef, useState, useEffect } from "react";
 // import "./styles.css";
 
 // export default function CVOptimizer() {
@@ -10,11 +9,12 @@
 //   const [showWelcome, setShowWelcome] = useState(true);
 //   const [welcomeFade, setWelcomeFade] = useState(false);
 //   const fileInputRef = useRef(null);
-//   const [cvUploaded, setCvUploaded] = useState(false);
 //   const [waitingCount, setWaitingCount] = useState(0);
+//   const [analysisDone, setAnalysisDone] = useState(false);
+//   const [cvSuggestions, setCvSuggestions] = useState([]);
+//   const [awaitingImproveAnswer, setAwaitingImproveAnswer] = useState(false);
 
 //   useEffect(() => {
-//     // Show welcome message on first load
 //     addMessage("היי! ברוכה הבאה למערכת Resume AI ✨", "ai");
 //   }, []);
 
@@ -22,24 +22,70 @@
 //     setMessages((prev) => [...prev, { text, sender }]);
 //   };
 
+// // ...existing code...
 //   const onSend = () => {
 //     if (!input.trim()) return;
 
 //     if (showWelcome) {
 //       setWelcomeFade(true);
-//       setTimeout(() => setShowWelcome(false), 500); // fade out duration
+//       setTimeout(() => setShowWelcome(false), 500);
 //     }
 
 //     addMessage(input, "user");
-//     // If a file is uploaded, treat the input as a job description and send to server
-//     if (uploadedFile) {
-//       addMessage("קיבלתי! שולחת את הקובץ לסרבר לעיבוד...", "ai");
-//       sendFileToServer(uploadedFile, input.trim());
-//     } else {
-//       // No file: keep the friendly mock response
+
+//     if (awaitingImproveAnswer) {
+//       const answer = input.trim().toLowerCase();
+//       if (answer === "כן" || answer === "yes") {
+//         if (cvSuggestions.length > 0) {
+//           // clean suggestions (ensure they are strings and remove accidental JSON wrapper)
+//           const cleanSuggestions = cvSuggestions.map((s) =>
+//             typeof s === "string" ? s.replace(/^\{[\s\S]*\}$/g, "").trim() : String(s)
+//           );
+
+//           const numbered = cleanSuggestions
+//             .map((s, i) => `${i + 1}. ${s}`)
+//             .join("\n");
+
+//           // ensure an empty line before the numbered list so each item starts on its own line
+//           addMessage(
+//             `הקורות חיים שלך מצוינים והם מקבלים ציון של ${cleanSuggestions.length}.\n\nהערות לשיפור הקורות החיים:\n\n${numbered}`,
+//             "ai"
+//           );
+//         } else {
+//           addMessage("אין לי הערות לשיפור, קורות החיים שלך מצוינים!", "ai");
+//         }
+//         setAwaitingImproveAnswer(false);
+//         // new separate question message
+//         addMessage("שנוציא יחד קובץ חדש ומתוקן של קורות חיים בשבילך?", "ai");
+//       } else if (answer === "לא" || answer === "no") {
+//         addMessage("חבל מאוד--- יכולת לקבל קורות חיים טובים יותר, אם את/ה מתחרט/ת אפשר תמיד להעלות שוב", "ai");
+//         setAwaitingImproveAnswer(false);
+//       } else {
+//         addMessage('אנא ענה "כן" או "לא"', "ai");
+//       }
+//       setInput("");
+//       return;
+//     }
+
+//     // אם לא הועלה קובץ, הצג הודעת המתנה מתאימה
+//     if (!uploadedFile) {
+//       setWaitingCount(waitingCount + 1);
 //       setTimeout(() => {
-//         addMessage("קיבלתי! מנתחת את קורות החיים שלך ✨", "ai");
+//         addMessage(
+//           waitingCount === 0
+//             ? "היי אני מחכה לקורות חיים שלך"
+//             : "עדיין מחכה----",
+//           "ai"
+//         );
 //       }, 600);
+//       setInput("");
+//       return;
+//     }
+
+//     // אם כבר בוצע ניתוח, הצג הודעות שירות בלבד
+//     if (analysisDone) {
+//       setInput("");
+//       return;
 //     }
 
 //     setInput("");
@@ -48,39 +94,31 @@
 //   const handleFileUpload = (file) => {
 //     setFileName(file.name);
 //     setUploadedFile(file);
+//     setWaitingCount(0);
+//     setAnalysisDone(false);
+//     setCvSuggestions([]);
+//     setAwaitingImproveAnswer(false);
 //     addMessage(`📄 קובץ נטען: ${file.name}`, "user");
 
 //     setTimeout(() => {
-//       addMessage("מחלצת טקסט מהקובץ…", "ai");
+//       addMessage("הקורות חיים באמצע ניתוח- זה הזמן להתפלל🙏", "ai");
 //     }, 400);
+
 //     setTimeout(() => {
-//       addMessage("הטקסט חולץ בהצלחה! עכשיו אפשר לנתח או לערוך אותו.", "ai");
+//       addMessage("קיבלתי את הקורות חיים שלך- ניכרת ההשקעה והזמן🙌", "ai");
+//       // שלח לשרת לקבלת המלצות בלבד
+//       sendFileToServer(file);
 //     }, 1200);
-//     // don't auto-send here; wait for user to enter job description and press Enter
-//     sendFileToServer(file, "software developer");
 //   };
 
-//   async function sendFileToServer(file, jobDescription) {
+//   async function sendFileToServer(file) {
 //     try {
-//       let jd = jobDescription || "software developer";
-//       addMessage("מעלה קובץ ומחכה לתשובה מהשרת...", "ai");
+//       addMessage("מנתח את הנתונים שלך -תהליך זה עלול לקחת כמה רגעים...", "ai");
 //       const form = new FormData();
-//       // include filename explicitly
 //       if (file && file instanceof File) {
 //         form.append("cv", file, file.name);
 //       } else {
-//         // if it's a blob-like, append as-is
 //         form.append("cv", file);
-//       }
-//       form.append("jobDescription", jd);
-
-//       // debug: list form entries
-//       try {
-//         for (const pair of form.entries()) {
-//           console.log("Form entry:", pair[0], pair[1]);
-//         }
-//       } catch (e) {
-//         console.warn(e);
 //       }
 
 //       const res = await fetch("http://localhost:3000/api/optimize-for-job", {
@@ -95,22 +133,25 @@
 //       }
 
 //       const body = await res.json();
-//       if (body && body.filename) {
-//         const downloadUrl = `http://localhost:3000/api/download/${encodeURIComponent(body.filename)}`;
-//         addMessage("הסרבר חזר עם קובץ מעובד — תחילת הורדה אוטומטית.", "ai");
-//         // Open download in new tab
-//         window.open(downloadUrl, "_blank");
-//         addMessage(`✅ קובץ מוכן להורדה: ${body.filename}`, "ai");
-//         // If server returned analysis, show suggestions
-//         if (body.analysis && Array.isArray(body.analysis.suggestions)) {
-//           addMessage("ניתוח והצעות לשיפור:", "ai");
-//           body.analysis.suggestions.forEach(s => addMessage(`• ${s}`, "ai"));
-//         } else if (body.analysis && body.analysis.keywords) {
-//           addMessage(`מילות מפתח זוהו: ${body.analysis.keywords.join(", ")}`, "ai");
-//         }
-//       } else {
-//         addMessage("הסרבר החזיר תשובה אך לא סיפק קובץ להורדה.", "ai");
+
+//       // שמור את ההערות לשיפור במצב
+//       let suggestions = [];
+//       if (
+//         body.analysis &&
+//         Array.isArray(body.analysis.suggestions) &&
+//         body.analysis.suggestions.length > 0
+//       ) {
+//         suggestions = body.analysis.suggestions;
 //       }
+//       setCvSuggestions(suggestions);
+
+//       // שאל את המשתמש אם הוא רוצה לשפר יחד
+//       setTimeout(() => {
+//         addMessage('האם אתה רוצה שנכתוב יחד קורות חיים משופרים?', "ai");
+//         setAwaitingImproveAnswer(true);
+//       }, 600);
+
+//       setAnalysisDone(true);
 //     } catch (e) {
 //       console.error(e);
 //       addMessage("שגיאה בתקשורת עם השרת — בדוק שהשרת רץ ונסה שוב.", "ai");
@@ -136,8 +177,8 @@
 //                 display: isWelcome && !showWelcome ? 'none' : 'flex'
 //               }}
 //             >
-//               <div
-//                 className="p-3 rounded-2xl max-w-xs"
+//                 <div
+//                 className="p-3 rounded-2xl msg-bubble"
 //                 style={{
 //                   background:
 //                     msg.sender === "user"
@@ -234,31 +275,44 @@ export default function CVOptimizer() {
 
     addMessage(input, "user");
 
-    // אם מחכים לתשובה האם לשפר קורות חיים
     if (awaitingImproveAnswer) {
       const answer = input.trim().toLowerCase();
       if (answer === "כן" || answer === "yes") {
         if (cvSuggestions.length > 0) {
+          // הפורמט החדש: ראשונה ולאחרונה בלי מספר, האמצעיות ממוספרות
+          const first = cvSuggestions[0];
+          const last = cvSuggestions[cvSuggestions.length - 1];
+          const middle = cvSuggestions.slice(1, -1);
+
+          let formattedSuggestions = "";
+          if (first) formattedSuggestions += `${first}\n`;
+          middle.forEach((s, i) => {
+            formattedSuggestions += `${i + 1}. ${s}\n`;
+          });
+          if (last && cvSuggestions.length > 1) formattedSuggestions += `${last}\n`;
+
           addMessage(
-            "הערות לשיפור קורות החיים שלך:\n" +
-              cvSuggestions.map((s) => `• ${s}`).join("\n"),
+            `הקורות חיים שלך מצוינים והם מקבלים ציון של ${cvSuggestions.length}.\n\n${formattedSuggestions}`,
             "ai"
           );
         } else {
           addMessage("אין לי הערות לשיפור, קורות החיים שלך מצוינים!", "ai");
         }
         setAwaitingImproveAnswer(false);
+        addMessage("שנוציא יחד קובץ חדש ומשוכלל יותר של קורות חיים בשבילך?", "ai");
       } else if (answer === "לא" || answer === "no") {
-        addMessage("חבל מאוד--- יכולת לקבל קורות חיים טובים יותר, אם את/ה מתחרט/ת אפשר תמיד להעלות  שוב", "ai");
+        addMessage(
+          "חבל מאוד--- יכולת לקבל קורות חיים טובים יותר, אם את/ה מתחרט/ת אפשר תמיד להעלות שוב",
+          "ai"
+        );
         setAwaitingImproveAnswer(false);
       } else {
-        addMessage('אנא ענה "כן" או "לא"', "ai");
+        addMessage(' 🤔על פי תשובתך לא הבנתי אם כן או לא', "ai");
       }
       setInput("");
       return;
     }
 
-    // אם לא הועלה קובץ, הצג הודעת המתנה מתאימה
     if (!uploadedFile) {
       setWaitingCount(waitingCount + 1);
       setTimeout(() => {
@@ -273,7 +327,6 @@ export default function CVOptimizer() {
       return;
     }
 
-    // אם כבר בוצע ניתוח, הצג הודעות שירות בלבד
     if (analysisDone) {
       setInput("");
       return;
@@ -297,57 +350,86 @@ export default function CVOptimizer() {
 
     setTimeout(() => {
       addMessage("קיבלתי את הקורות חיים שלך- ניכרת ההשקעה והזמן🙌", "ai");
-      // שלח לשרת לקבלת המלצות בלבד
       sendFileToServer(file);
     }, 1200);
   };
 
-  async function sendFileToServer(file) {
-    try {
-      addMessage("מנתח את הנתונים שלך -תהליך זה עלול לקחת כמה רגעים...", "ai");
-      const form = new FormData();
-      if (file && file instanceof File) {
-        form.append("cv", file, file.name);
-      } else {
-        form.append("cv", file);
-      }
+  // async function sendFileToServer(file) {
+  //   try {
+  //     addMessage("מנתח את הנתונים שלך -תהליך זה עלול לקחת כמה רגעים...", "ai");
+  //     const form = new FormData();
+  //     form.append("cv", file, file.name);
 
-      const res = await fetch("http://localhost:3000/api/optimize-for-job", {
-        method: "POST",
-        body: form,
-      });
+  //     const res = await fetch("http://localhost:3000/api/optimize-for-job", {
+  //       method: "POST",
+  //       body: form,
+  //     });
 
-      if (!res.ok) {
-        const txt = await res.text();
-        addMessage(`שגיאה מהשרת: ${txt}`, "ai");
-        return;
-      }
+  //     if (!res.ok) {
+  //       const txt = await res.text();
+  //       addMessage(`שגיאה מהשרת: ${txt}`, "ai");
+  //       return;
+  //     }
 
-      const body = await res.json();
+  //     const body = await res.json();
+  //     let suggestions = [];
+  //     if (body.analysis && Array.isArray(body.analysis.suggestions)) {
+  //       suggestions = body.analysis.suggestions;
+  //     }
+  //     setCvSuggestions(suggestions);
 
-      // שמור את ההערות לשיפור במצב
-      let suggestions = [];
-      if (
-        body.analysis &&
-        Array.isArray(body.analysis.suggestions) &&
-        body.analysis.suggestions.length > 0
-      ) {
-        suggestions = body.analysis.suggestions;
-      }
-      setCvSuggestions(suggestions);
+  //     setTimeout(() => {
+  //       addMessage('האם אתה רוצה שנכתוב יחד קורות חיים משופרים?', "ai");
+  //       setAwaitingImproveAnswer(true);
+  //     }, 600);
 
-      // שאל את המשתמש אם הוא רוצה לשפר יחד
-      setTimeout(() => {
-        addMessage('האם אתה רוצה שנכתוב יחד קורות חיים משופרים?', "ai");
-        setAwaitingImproveAnswer(true);
-      }, 600);
+  //     setAnalysisDone(true);
+  //   } catch (e) {
+  //     console.error(e);
+  //     addMessage("שגיאה בתקשורת עם השרת — בדוק שהשרת רץ ונסה שוב.", "ai");
+  //   }
+  // }
+async function sendFileToServer(file) {
+  try {
+    addMessage("מנתח את הנתונים שלך -תהליך זה עלול לקחת כמה רגעים...", "ai");
+    const form = new FormData();
+    form.append("cv", file, file.name);
 
-      setAnalysisDone(true);
-    } catch (e) {
-      console.error(e);
-      addMessage("שגיאה בתקשורת עם השרת — בדוק שהשרת רץ ונסה שוב.", "ai");
+    const res = await fetch("http://localhost:3000/api/optimize-for-job", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      addMessage(`שגיאה מהשרת: ${txt}`, "ai");
+      return;
     }
+
+    const body = await res.json();
+
+    let suggestions = [];
+    if (body.analysis && Array.isArray(body.analysis.suggestions)) {
+      suggestions = body.analysis.suggestions;
+    }
+    setCvSuggestions(suggestions);
+
+    // קבלת ההערה מה־backend
+    const compliment = body.analysis?.compliment || "";
+    if (compliment) {
+      addMessage(`📌 : ${compliment}`, "ai");
+    }
+    setTimeout(() => {
+      addMessage('האם אתה רוצה שנכתוב יחד קורות חיים משופרים?', "ai");
+      setAwaitingImproveAnswer(true);
+    }, 600);
+
+    setAnalysisDone(true);
+  } catch (e) {
+    console.error(e);
+    addMessage("שגיאה בתקשורת עם השרת — בדוק שהשרת רץ ונסה שוב.", "ai");
   }
+}
 
   return (
     <div className="max-w-4xl mx-auto fade-in" style={{ paddingBottom: "6rem" }}>
@@ -365,18 +447,19 @@ export default function CVOptimizer() {
               style={{
                 opacity: isWelcome && welcomeFade ? 0 : 1,
                 transition: isWelcome ? "opacity 0.5s ease" : undefined,
-                display: isWelcome && !showWelcome ? 'none' : 'flex'
+                display: isWelcome && !showWelcome ? "none" : "flex",
               }}
             >
               <div
-                className="p-3 rounded-2xl max-w-xs"
+                className="p-3 rounded-2xl msg-bubble"
                 style={{
                   background:
                     msg.sender === "user"
                       ? "linear-gradient(to right, var(--gemini-blue), var(--gemini-indigo))"
                       : "var(--gemini-card)",
                   color: msg.sender === "user" ? "white" : "var(--gemini-text)",
-                  boxShadow: msg.sender === "ai" ? "0 0 12px rgba(99,102,241,0.5)" : "none",
+                  boxShadow:
+                    msg.sender === "ai" ? "0 0 12px rgba(99,102,241,0.5)" : "none",
                 }}
               >
                 {msg.text}
