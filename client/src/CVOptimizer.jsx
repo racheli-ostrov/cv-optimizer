@@ -433,6 +433,7 @@ export default function CVOptimizer() {
   }
 
 const downloadImprovedPDF = async (improvedContent) => {
+  console.log("Sending to PDF:", improvedContent);
   const response = await fetch("http://localhost:3000/api/download-improved-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

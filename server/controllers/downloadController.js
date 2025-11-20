@@ -37,7 +37,7 @@ import path from "path";
 export const downloadImprovedPDF = (req, res) => {
   try {
     const { improvedContent } = req.body;
-
+console.log("Received content:", improvedContent);
     if (!improvedContent || improvedContent.trim() === "") {
       return res.status(400).json({ error: "No content provided" });
     }

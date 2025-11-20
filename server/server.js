@@ -70,7 +70,7 @@ app.post("/api/optimize-for-job", upload.single("cv"), async (req, res) => {
 קורות חיים (base64): ${base64CV}
     `;
 
-    const modelName = process.env.MODEL_NAME || "models/gemini-2.5-flash" || "Gemini 2.0 Flash-Lite" || "Gemini 1.5 Pro";
+    const modelName = process.env.MODEL_NAME || "models/gemini-2.5-flash" ||"models/gemini-2.0-flash"|| "Gemini 2.0 Flash-Lite" || "Gemini 1.5 Pro";
     const payload = {
       model: modelName,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -91,14 +91,17 @@ app.post("/api/optimize-for-job", upload.single("cv"), async (req, res) => {
       aiOutput = "";
     }
 
-    if ((!aiOutput || aiOutput.length < 2) && aiResponse?.candidates?.[0]?.content) {
-      const allParts =
-        aiResponse?.candidates?.[0]?.content
-          .flatMap((c) =>
-            (c.parts || []).filter((p) => p && p.text).map((p) => p.text)
-          ) || [];
-      aiOutput = allParts.join("\n");
-    }
+if ((!aiOutput || aiOutput.length < 2) && aiResponse?.candidates?.[0]?.content) {
+  const content = aiResponse.candidates[0].content;
+
+  // אם יש parts
+  if (Array.isArray(content.parts)) {
+    const allTexts = content.parts
+      .filter((p) => p?.text)
+      .map((p) => p.text);
+    aiOutput = allTexts.join("\n");
+  }
+}
 
     const parsedOutput = { suggestions: [], compliment: "", score: 0 };
 
