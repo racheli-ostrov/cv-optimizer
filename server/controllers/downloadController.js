@@ -41,11 +41,29 @@ console.log("Received content:", improvedContent);
     if (!improvedContent || improvedContent.trim() === "") {
       return res.status(400).json({ error: "No content provided" });
     }
+    // Ensure output directory exists to avoid stream ENOENT errors
+    const outDir = path.join(process.cwd(), "generated-pdf");
+    try {
+      fs.mkdirSync(outDir, { recursive: true });
+    } catch (e) {
+      console.error("Failed to ensure generated-pdf dir:", e);
+    }
 
     const doc = new PDFDocument();
     const pdfName = `improved_cv_${Date.now()}.pdf`;
-    const pdfPath = path.join(process.cwd(), "generated-pdf", pdfName);
+    const pdfPath = path.join(outDir, pdfName);
     const stream = fs.createWriteStream(pdfPath);
+
+    // Handle stream errors to avoid crashing the process
+    stream.on("error", (err) => {
+      console.error("Write stream error:", err);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to write PDF" });
+    });
+
+    doc.on("error", (err) => {
+      console.error("PDF document error:", err);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
+    });
 
     doc.pipe(stream);
 
@@ -60,7 +78,7 @@ console.log("Received content:", improvedContent);
       res.download(pdfPath, "improved_cv.pdf", (err) => {
         if (err) {
           console.error(err);
-          res.status(500).send("Error downloading the PDF");
+          if (!res.headersSent) res.status(500).send("Error downloading the PDF");
         } else {
           fs.unlink(pdfPath, () => {}); // למחוק אחרי הורדה
         }
@@ -70,5 +88,33 @@ console.log("Received content:", improvedContent);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to generate PDF" });
+  }
+};
+
+// Serve a previously-generated file from the `generated/` folder
+export const downloadGeneratedFile = (req, res) => {
+  try {
+    const { filename } = req.params;
+    if (!filename) return res.status(400).json({ error: "Filename required" });
+
+    const filePath = path.join(process.cwd(), "generated", filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    res.download(filePath, filename, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+      } else {
+        // remove the file after successful download
+        fs.unlink(filePath, (unlinkErr) => {
+          if (unlinkErr) console.error("Failed to unlink file:", unlinkErr);
+        });
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to serve file" });
   }
 };

@@ -7,11 +7,14 @@
 
 // export default router;
 import express from "express";
-import { downloadImprovedPDF } from "../controllers/downloadController.js";
+import { downloadImprovedPDF, downloadGeneratedFile } from "../controllers/downloadController.js";
 
 const router = express.Router();
 
-router.post("/download-improved-pdf", downloadImprovedPDF);
+// Match client behavior: serve previously-generated file by filename
+router.get("/download/:filename", downloadGeneratedFile);
 
+// Keep the POST endpoint that creates and immediately returns a generated PDF
+router.post("/download-improved-pdf", downloadImprovedPDF);
 
 export default router;

@@ -439,10 +439,27 @@ const downloadImprovedPDF = async (improvedContent) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ improvedContent }),
   });
+  if (!response.ok) {
+    // Try to extract server error text for better debugging
+    let txt = "Failed to generate PDF";
+    try {
+      txt = await response.text();
+    } catch (e) {
+      // ignore
+    }
+    throw new Error(txt || "Failed to generate PDF");
+  }
 
-  if (!response.ok) throw new Error("Failed to generate PDF");
+  // Read as ArrayBuffer then build a Blob with explicit PDF MIME type
+  const arrayBuffer = await response.arrayBuffer();
+  // Quick sanity check: small responses may be error messages
+  if (arrayBuffer.byteLength < 50) {
+    // decode as text to surface server-side error
+    const txt = new TextDecoder().decode(arrayBuffer);
+    throw new Error(`Server returned unexpected small response: ${txt}`);
+  }
 
-  const blob = await response.blob();
+  const blob = new Blob([arrayBuffer], { type: "application/pdf" });
   const url = window.URL.createObjectURL(blob);
 
   const a = document.createElement("a");

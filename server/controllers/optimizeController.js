@@ -8,9 +8,9 @@ export const optimizeCV = async (req, res) => {
     console.log('Content-Type:', req.headers['content-type']);
     console.log('Body keys:', Object.keys(req.body || {}));
     console.log('File:', req.file ? { originalname: req.file.originalname, mimetype: req.file.mimetype, size: req.file.size } : null);
-    const { jobDescription } = req.body;
+    // Accept empty jobDescription (client may upload first and provide JD later)
+    const jobDescription = (req.body.jobDescription || "").toString();
     if (!req.file) return res.status(400).json({ error: "No CV uploaded" });
-    if (!jobDescription) return res.status(400).json({ error: "Job description missing" });
 
     const base64CV = fs.readFileSync(req.file.path).toString("base64");
 
