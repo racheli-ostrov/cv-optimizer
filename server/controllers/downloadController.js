@@ -60,10 +60,17 @@ export const downloadImprovedPDF = (req, res) => {
         return;
       }
 
-      const keywords = ["Education","Experience","Skills","Projects","Certifications","Awards","Volunteer Work","Internships","Profile",
-        "Publications","Hobbies","Interests","References","Summary","Professional Profile","About Me","Objective","Career Objective","Key Skills","Core Competencies",
-        "Achievements","Technical Skills","Soft Skills","Portfolio","Leadership Experience","Courses","Conferences","Workshops"];
-      const isHeading = keywords.some(k => trimmedLine.startsWith(k));
+  const keywords = [
+  "Education","Experience","Skills","Projects","Volunteer Work","Internships",
+  "Profile","Publications","Hobbies","Interests","References","Summary","Professional Summary",
+  "Professional Profile","About Me","Objective","Key Skills","Achievements",
+  "Technical Skills","Soft Skills","Portfolio","Leadership Experience","Courses"
+];
+
+const isHeading = keywords.some(k =>
+  trimmedLine.toLowerCase().startsWith(k.toLowerCase())
+);
+
 
       if (isHeading) {
         doc.moveDown(0.5);

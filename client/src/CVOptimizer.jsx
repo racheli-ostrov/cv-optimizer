@@ -291,7 +291,7 @@ export default function CVOptimizer() {
     setAnalysisDone(false);
     setCvSuggestions([]);
     setAwaitingImproveAnswer(false);
-    addMessage(`📄 קובץ נטען: ${file.name}`, "user");
+    addMessage(`📄 ${file.name}`, "user");
 
     setTimeout(() => {
       addMessage("הקורות חיים באמצע ניתוח- זה הזמן להתפלל🙏", "ai");
