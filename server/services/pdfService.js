@@ -1,85 +1,177 @@
-import PDFDocument from "pdfkit";
+// import PDFDocument from "pdfkit";
+// import fs from "fs";
+// import os from "os";
+// import { GoogleGenAI } from "@google/genai";
+// import PDFDocument from "pdfkit";
+
+// export const optimizeCVService = async (base64CV, jobDescription) => {
+//   const genAI = new GoogleGenAI({
+//     apiKey: process.env.GOOGLE_API_KEY,
+//   });
+
+//   // Convert uploaded file back to text
+//   const originalCVText = Buffer.from(base64CV, "base64").toString("utf8");
+
+//   const prompt = `
+// אתה כותב קורות חיים מקצועי. כתוב מחדש את קורות החיים הבאים במלואם כך שיהיו ברורים יותר, מובנים ומשופרים. התאם אותם לתיאור התפקיד של המשתמש.
+
+// Job description:
+// ${jobDescription}
+
+// Original resume:
+// ${originalCVText}
+
+// Return ONLY a clean improved resume text (no explanations).
+//   `;
+
+//   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+//   const result = await model.generateContent(prompt);
+//   const improvedCV = result.response.text();
+
+//   // Convert improved CV text → PDF
+//   const doc = new PDFDocument({ size: "A4", margin: 40 });
+//   const buffers = [];
+//   doc.on("data", buffers.push.bind(buffers));
+//   doc.on("end", () => {});
+
+//   doc.font("Times-Roman").fontSize(12).text(improvedCV, {
+//     align: "left",
+//   });
+
+//   doc.end();
+
+//   return Buffer.concat(buffers);
+// };
+// services/pdfService.js
 import fs from "fs";
 import os from "os";
+import path from "path";
+import PDFDocument from "pdfkit";
+import pdfParse from "pdf-parse";
+import mammoth from "mammoth";
+import { GoogleGenAI } from "@google/genai";
+import { fileURLToPath } from "url";
+import crypto from "crypto";
 
-// Local fallback optimizer that produces a simple optimized CV PDF.
-// This avoids a hard dependency on an external LLM and makes the app work offline.
-export const optimizeCVService = async (base64CV, jobDescription) => {
-  // Basic heuristic: build a short optimized text header using keywords from the job description.
-  const jd = (jobDescription || "").toString();
-  const keywords = Array.from(new Set(jd
-    .replace(/[\W_]+/g, " ")
-    .split(/\s+/)
-    .filter(w => w.length > 3)
-    .slice(0, 12)
-  ));
+// helper to write temp file
+const writeTempFile = (buffer, ext = "") => {
+  const name = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
+  const p = path.join(os.tmpdir(), name);
+  fs.writeFileSync(p, buffer);
+  return p;
+};
 
-  const optimizedTextLines = [];
-  optimizedTextLines.push("Optimized Resume (auto-generated)");
-  optimizedTextLines.push("=====================================");
-  optimizedTextLines.push(`Tailored for: ${jd.substring(0, 300)}`);
-  if (keywords.length) {
-    optimizedTextLines.push("");
-    optimizedTextLines.push("Suggested keywords to emphasize:");
-    optimizedTextLines.push(keywords.join(", "));
+const extractTextFromBuffer = async (buffer, mimetype, originalName) => {
+  const lower = (originalName || "").toLowerCase();
+  try {
+    if (mimetype === "application/pdf" || lower.endsWith(".pdf")) {
+      const data = await pdfParse(buffer);
+      return (data && data.text) ? data.text : "";
+    }
+
+    if (
+      mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      lower.endsWith(".docx")
+    ) {
+      // mammoth accepts a Buffer directly (Node)
+      const res = await mammoth.extractRawText({ buffer });
+      return res.value || "";
+    }
+
+    if (mimetype === "application/msword" || lower.endsWith(".doc")) {
+      // mammoth can sometimes handle doc but it's not guaranteed.
+      const res = await mammoth.extractRawText({ buffer }).catch(() => ({ value: "" }));
+      if (res && res.value) return res.value;
+    }
+
+    // fallback: try to decode as utf8 plain text
+    return buffer.toString("utf8");
+  } catch (e) {
+    // best-effort fallback
+    try {
+      return buffer.toString("utf8");
+    } catch (ee) {
+      return "";
+    }
   }
-  optimizedTextLines.push("");
-  optimizedTextLines.push("Summary (auto):");
-  optimizedTextLines.push("Experienced candidate with relevant background. Emphasize achievements and quantifiable results tailored to the job description.");
-  optimizedTextLines.push("");
-  optimizedTextLines.push("(Original CV was uploaded and is available to the recruiter.)");
+};
 
-  const improvedContent = optimizedTextLines.join(os.EOL);
+const callGenAIForImprovedResume = async (originalText, jobDescription) => {
+  const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
-  // Create PDF buffer
-  const doc = new PDFDocument({ size: "A4", margin: 50 });
+  // Keep prompt concise but informative. Trim originalText if very large.
+  const originalTrimmed =
+    originalText.length > 50000 ? originalText.slice(0, 50000) + "\n...(truncated)" : originalText;
+
+  const prompt = `
+You are a professional resume writer. Rewrite the following resume as a complete, clean, well-structured CV, tailored to the provided job description.
+Output ONLY the improved resume (no commentary, no numbered list of changes).
+Write sections: Contact (name/email/phone if present), Professional Summary, Skills/Technologies, Experience (bulleted, with achievements), Education, Projects (if relevant).
+Keep formatting plain text.
+
+Job description:
+${jobDescription || "(none provided)"}
+
+Original resume (raw text):
+${originalTrimmed}
+  `;
+
+  // Example using the same pattern as earlier messages. Adjust to your GenAI SDK usage if different.
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const result = await model.generateContent(prompt);
+
+  // adapt depending on SDK shape
+  // try multiple possible shapes defensively
+  let improvedText = "";
+  if (!result) throw new Error("No response from GenAI");
+  if (result.response && typeof result.response.text === "function") {
+    improvedText = result.response.text();
+  } else if (result.output && Array.isArray(result.output) && result.output.length) {
+    improvedText = result.output.map(o => o.content || o.text || "").join("\n");
+  } else if (result.text) {
+    improvedText = result.text;
+  } else {
+    improvedText = JSON.stringify(result).slice(0, 20000);
+  }
+
+  return improvedText;
+};
+
+export const optimizeCVService = async (base64CV, jobDescription = "", originalName = "uploaded", mimetype = "") => {
+  // decode
+  const buffer = Buffer.from(base64CV, "base64");
+
+  // extract text from uploaded file
+  const extractedText = await extractTextFromBuffer(buffer, mimetype, originalName);
+
+  // call AI to produce an improved resume text
+  const improvedText = await callGenAIForImprovedResume(extractedText, jobDescription);
+
+  // convert improved text into a PDF (simple layout)
+  const doc = new PDFDocument({ size: "A4", margin: 40, autoFirstPage: true });
   const buffers = [];
   doc.on("data", buffers.push.bind(buffers));
   doc.on("end", () => {});
 
-  doc.font("Times-Roman").fontSize(12).text(improvedContent, { align: "left" });
+  // Basic nice formatting: split by double newlines into sections
+  const lines = improvedText.split(/\r?\n/);
+
+  // Header: if first lines look like name/contact, print larger
+  doc.fontSize(12);
+  let y = doc.y;
+
+  // Print all text; keep line breaks
+  doc.font("Times-Roman").fontSize(11);
+  for (const line of lines) {
+    // Avoid extremely long lines -- wrap automatically by doc.text
+    doc.text(line, { align: "left", paragraphGap: 2 });
+  }
+
   doc.end();
 
   const pdfBuffer = Buffer.concat(buffers);
 
-  const analysis = { keywords };
-
-  // Additional heuristic suggestions (try to decode base64 and run simple checks)
-  let decoded = "";
-  try {
-    const buf = Buffer.from(base64CV, "base64");
-    decoded = buf.toString("utf8");
-  } catch (e) {
-    decoded = "";
-  }
-
-  const suggestions = [];
-  const hasEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(decoded);
-  const hasPhone = /\+?\d[\d \-()]{6,}\d/.test(decoded);
-  if (!hasEmail) suggestions.push("הוסף כתובת אימייל מקצועית בראש הקורות החיים.");
-  if (!hasPhone) suggestions.push("הוסף מספר טלפון ברור ליצירת קשר.");
-
-  const lower = decoded.toLowerCase();
-  const sections = ["ניסיון", "השכלה", "כישורים", "projects", "experience", "education"];
-  const foundSection = sections.some(s => lower.includes(s));
-  if (!foundSection) suggestions.push("הוספת כותרות ברורות (ניסיון/השכלה/כישורים) תשפר קריאות.");
-
-  if (!/\d+/.test(decoded)) suggestions.push("הדגש הישגים כמותיים (אחוזים, סכומים, מספרים) כדי להמחיש השפעה.");
-
-  // Technology check using job description keywords too
-  if (keywords && keywords.length) {
-    const techs = keywords.filter(k => /javascript|python|react|node|java|docker|sql|git|c#/i.test(k));
-    if (!techs.length) suggestions.push("צויין תיאור משרה ללא אזכור טכנולוגיות — אם יש לך ניסיון בטכנולוגיות, ציין אותן בבירור.");
-  }
-
-  // action verbs
-  if (/אחראי על|עבדתי|התמודד עם|היה אחראי/.test(lower)) suggestions.push("החלף ניסוחים פסיביים בפעלים מדידים וחזקים (למשל: 'הובילתי', 'שיפרתי', 'הגדלתי').");
-
-  if (suggestions.length === 0) {
-    suggestions.push("נראה שקורות החיים כוללים פרטים חשובים — שקול להדגיש הישגים כמותיים ולציין טכנולוגיות רלוונטיות.");
-  }
-
-  analysis.suggestions = suggestions;
-
-  return { improvedContent: pdfBuffer, analysis };
+  // cleanup not necessary because we didn't create temp files (except maybe in extraction)
+  return pdfBuffer;
 };
