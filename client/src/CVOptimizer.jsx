@@ -24,6 +24,19 @@ export default function CVOptimizer() {
     setMessages((prev) => [...prev, { text, sender }]);
   };
 
+  // Reset UI to initial waiting-for-CV state (circular flow)
+  const resetToInitial = () => {
+    addMessage("היי אני מחכה לקורות חיים שלך — את/ה יכול/ה להעלות קובץ בכל שלב", "ai");
+    setUploadedFile(null);
+    setFileName(null);
+    setAnalysisDone(false);
+    setImprovedContent("");
+    setCvSuggestions([]);
+    setAwaitingImproveAnswer(false);
+    setAwaitingDownloadAnswer(false);
+    setInput("");
+  };
+
 
 
   async function sendFileToServer(file) {
@@ -110,6 +123,13 @@ export default function CVOptimizer() {
     a.click();
     a.remove(); // להסיר אחרי ההורדה
     window.URL.revokeObjectURL(url); // לשחרר זיכרון
+
+    // after successful download, reset UI to initial waiting state
+    try {
+      resetToInitial();
+    } catch (e) {
+      // ignore
+    }
 
 
   };
@@ -218,18 +238,15 @@ export default function CVOptimizer() {
         setAwaitingDownloadAnswer(true); // שלב הבא: הורדת PDF
         addMessage("שנוציא יחד קובץ חדש ומשוכלל יותר של קורות חיים בשבילך?", "ai");
       } else if (answer === "לא" || answer === "no") {
-        addMessage(
-          "חבל מאוד--- יכולת לקבל קורות חיים טובים יותר, אם את/ה מתחרט/ת אפשר תמיד להעלות שוב",
-          "ai"
-        );
-        setAwaitingImproveAnswer(false);
-      } else {
-        addMessage(' 🤔 על פי תשובתך לא הבנתי אם כן או לא', "ai");
-      }
+        // User declined improvements — reset to initial waiting state
+        resetToInitial();
+        } else {
+          addMessage(' 🤔 על פי תשובתך לא הבנתי אם כן או לא', "ai");
+        }
 
-      setInput("");
-      return;
-    }
+        setInput("");
+        return;
+      }
 
     // --- שלב 2: הורדת PDF ---
     if (awaitingDownloadAnswer) {
@@ -242,7 +259,8 @@ export default function CVOptimizer() {
           addMessage("שגיאה ביצירת ה-PDF, נסה/י שוב מאוחר יותר.", "ai");
         }
       } else if (answer === "לא" || answer === "no") {
-        addMessage("בסדר, אם תרצה/י אפשר תמיד לנסות שוב.", "ai");
+        // User declined download — reset to initial waiting state
+        resetToInitial();
       } else {
         addMessage(' 🤔 לא הבנתי אם רוצים להוריד את הקובץ או לא', "ai");
       }
