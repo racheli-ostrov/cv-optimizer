@@ -327,7 +327,7 @@ export default function CVOptimizer() {
   return (
     <div className="max-w-4xl mx-auto fade-in" style={{ paddingBottom: "6rem" }}>
       <h3 className="text-3xl font-bold mb-4" style={{ color: "var(--gemini-indigo)" }}>
-        🐾 ChatCV — הבא נשדרג את הקורות חיים שלך
+        🐾 ChatCV — הבה נשדרג את קורות החיים שלך
       </h3>
 
       <div className="shadow-card p-4" style={{ height: "70vh", overflowY: "auto" }}>
