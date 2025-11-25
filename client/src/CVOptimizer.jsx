@@ -17,7 +17,7 @@ export default function CVOptimizer() {
   const [improvedContent, setImprovedContent] = useState("");
 
   useEffect(() => {
-    addMessage("היי! ברוכה הבאה למערכת Resume AI ✨", "ai");
+    addMessage("היי! ברוכה הבאה למערכת . Resume AI ✨ תוכל להעלות אך ורק קבצים המתאימים למערכת ATS.למשרות ממשלתיות (קורות חיים בעברית) יש לשלוח בקישור הזה: http://hebrewresume", "ai");
   }, []);
 
   const addMessage = (text, sender = "user") => {
