@@ -55,9 +55,11 @@ export default function CVOptimizer() {
         const txt = await res.text();
         if (txt.includes('"code":429')) {
           addMessage("המערכת עמוסה כרגע, אנא נסה שנית בעוד מספר שניות ⏳", "ai");
+          resetToInitial();
           return;
         }
         addMessage(`שגיאה מהשרת: ${txt}`, "ai");
+        resetToInitial();
         return;
       }
 
@@ -73,6 +75,7 @@ export default function CVOptimizer() {
       // שמירת הגרסה המשופרת להורדה
       const improvedText = body.improvedResume || "";
       setImprovedContent(improvedText);
+      console.log("Improved content received:", improvedText);
 
       // הודעות למשתמש
       setTimeout(() => {
@@ -94,7 +97,7 @@ export default function CVOptimizer() {
       addMessage("אין תוכן משופר להורדה.", "ai");
       return;
     }
-
+    console.log(improvedContent)
     const response = await fetch("http://localhost:3000/api/download-improved-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -240,13 +243,13 @@ export default function CVOptimizer() {
       } else if (answer === "לא" || answer === "no") {
         // User declined improvements — reset to initial waiting state
         resetToInitial();
-        } else {
-          addMessage(' 🤔 על פי תשובתך לא הבנתי אם כן או לא', "ai");
-        }
-
-        setInput("");
-        return;
+      } else {
+        addMessage(' 🤔 על פי תשובתך לא הבנתי אם כן או לא', "ai");
       }
+
+      setInput("");
+      return;
+    }
 
     // --- שלב 2: הורדת PDF ---
     if (awaitingDownloadAnswer) {
