@@ -2,32 +2,28 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 
-// פונקציה ליצירת PDF משופר מהתוכן שהתקבל
 export const downloadImprovedPDF = (req, res) => {
+  const { improvedContent } = req.body;
+
+  if (!improvedContent || improvedContent.trim() === "") {
+    return res.status(400).json({ error: "No content provided" });
+  }
+
   try {
-    const { improvedContent } = req.body;
-
-    if (!improvedContent || improvedContent.trim() === "") {
-      return res.status(400).json({ error: "No content provided" });
-    }
-
-    // Ensure output directory exists
     const outDir = path.join(process.cwd(), "generated-pdf");
     fs.mkdirSync(outDir, { recursive: true });
 
-    const lines = improvedContent.split("\n");
-    const firstLine = lines[0] ? lines[0].trim().replace(/[\/\\?%*:|"<>]/g, "_") : "cv"; // מנקה תווים בעייתיים
-    const pdfName = `${firstLine}_improved.pdf`;
+    const pdfName = `improved_${Date.now()}.pdf`;
     const pdfPath = path.join(outDir, pdfName);
 
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
     const stream = fs.createWriteStream(pdfPath);
 
-    // Stream and doc error handling
     stream.on("error", (err) => {
       console.error("Write stream error:", err);
       if (!res.headersSent) res.status(500).json({ error: "Failed to write PDF" });
     });
+
     doc.on("error", (err) => {
       console.error("PDF document error:", err);
       if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
@@ -35,68 +31,32 @@ export const downloadImprovedPDF = (req, res) => {
 
     doc.pipe(stream);
 
-    // Load font
-    const fontPath = path.join(process.cwd(), "fonts", "ComicSansMS.ttf");
-    if (fs.existsSync(fontPath)) {
-      doc.font(fontPath);
-    } else {
-      console.warn("Font file not found, using default");
-    }
-
-    lines.forEach((line, index) => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) return;
-
-      if (index === 0) {
-        // השורה הראשונה – גדולה ביותר, כחול
-        doc.fontSize(20).fillColor("blue").text(trimmedLine, { align: "left" });
-        return; // אין רווח אחרי השורה הראשונה
-      }
-
-      if (index === 1) {
-        // השורה השנייה – כותרת רגילה, כחול כהה
+    const lines = improvedContent.split("\n");
+    lines.forEach((line) => {
+      if (line.trim() !== "") {
+        doc.font("Helvetica").fontSize(12).text(line.trim(), { align: "left" });
         doc.moveDown(0.2);
-        doc.fontSize(16).fillColor("#003366").text(trimmedLine, { align: "left" });
-        return;
-      }
-
-  const keywords = [
-  "Education","Experience","Skills","Projects","Volunteer Work","Internships",
-  "Profile","Publications","Hobbies","Interests","References","Summary","Professional Summary",
-  "Professional Profile","About Me","Objective","Key Skills","Achievements",
-  "Technical Skills","Soft Skills","Portfolio","Leadership Experience","Courses"
-];
-
-const isHeading = keywords.some(k =>
-  trimmedLine.toLowerCase().startsWith(k.toLowerCase())
-);
-
-
-      if (isHeading) {
-        doc.moveDown(0.5);
-        doc.fontSize(14).fillColor("blue").text(trimmedLine, { align: "left" });
-        doc.moveDown(0.3);
-      } else {
-        doc.moveDown(0.15);
-        doc.fontSize(12).fillColor("black").text(trimmedLine, { align: "left" });
       }
     });
 
     doc.end();
 
     stream.on("finish", () => {
+      console.log(`✅ PDF created successfully: ${pdfName}`);
       res.download(pdfPath, pdfName, (err) => {
         if (err) {
           console.error(err);
           if (!res.headersSent) res.status(500).send("Error downloading the PDF");
         } else {
-          fs.unlink(pdfPath, () => {}); // מחיקה אחרי הורדה
+          fs.unlink(pdfPath, (unlinkErr) => {
+            if (unlinkErr) console.error("Failed to delete temp file:", unlinkErr);
+          });
         }
       });
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to generate PDF" });
+    console.error("PDF Generation Error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
   }
 };

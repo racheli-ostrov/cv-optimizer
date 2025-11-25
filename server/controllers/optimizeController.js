@@ -16,7 +16,6 @@ export const optimizeCV = async (req, res) => {
     const fileBuffer = fs.readFileSync(req.file.path);
     const base64CV = fileBuffer.toString("base64");
 
-    // Pass original filename and mimetype so service can choose extraction method
     const improvedPDFBuffer = await optimizeCVService(base64CV, jobDescription, req.file.originalname, req.file.mimetype);
 
     const outputDir = path.join(process.cwd(), "generated");
@@ -27,10 +26,8 @@ export const optimizeCV = async (req, res) => {
 
     fs.writeFileSync(outputPath, improvedPDFBuffer);
 
-    // remove temp uploaded file
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
 
-    // return filename for client to download
     res.json({ filename: outputFileName });
   } catch (err) {
     console.error("optimizeCV error:", err);
